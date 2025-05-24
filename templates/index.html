@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image to Text OCR</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Image to Text OCR</h1>
+        
+        <div class="input-methods">
+            <div class="camera-section">
+                <h2>Camera Capture</h2>
+                <div id="camera-container">
+                    <video id="video" autoplay playsinline></video>
+                    <button id="startCamera">Start Camera</button>
+                    <button id="captureImage" disabled>Capture Image</button>
+                    <canvas id="canvas" style="display: none;"></canvas>
+                </div>
+            </div>
+
+            <div class="upload-section">
+                <h2>File Upload</h2>
+                <div class="file-upload">
+                    <input type="file" id="fileInput" accept="image/*">
+                    <label for="fileInput" class="upload-label">
+                        Choose File or Drag & Drop
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="output-container">
+            <div class="preview-section">
+                <h2>Image Preview</h2>
+                <div class="controls">
+                    <div class="control-item">
+                        <input type="checkbox" id="showBoxes" checked>
+                        <label for="showBoxes">Show Text Boxes</label>
+                    </div>
+                    <div class="control-item">
+                        <label for="confidenceThreshold">Confidence:</label>
+                        <input type="range" id="confidenceThreshold" min="0" max="100" value="60">
+                        <span id="confidenceValue">60%</span>
+                    </div>
+                    <div class="control-item">
+                        <label for="groupThreshold">Group Distance:</label>
+                        <input type="range" id="groupThreshold" min="0" max="50" value="10">
+                        <span id="groupValue">10px</span>
+                    </div>
+                    <div class="control-item">
+                        <label for="preprocessingView">Preprocessing:</label>
+                        <select id="preprocessingView" class="preprocessing-select">
+                            <option value="original">Original</option>
+                            <option value="grayscale">Grayscale</option>
+                            <option value="threshold">Threshold</option>
+                            <option value="denoised">Denoised</option>
+                            <option value="enhanced">Enhanced</option>
+                            <option value="final">Final</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="image-preview">
+                    <div class="preview-container">
+                        <img id="previewImage" style="display: none;">
+                        <canvas id="boxesCanvas" class="boxes-overlay"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="result-section">
+                <h2>Extracted Text</h2>
+                <div id="loadingSpinner" class="spinner" style="display: none;"></div>
+                <div id="result" class="result-box"></div>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html> 

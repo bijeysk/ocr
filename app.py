@@ -8,6 +8,12 @@ import cv2
 import numpy as np
 import io
 import base64
+import subprocess
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
@@ -15,6 +21,30 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 # Ensure upload folder exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# Log Tesseract configuration
+try:
+    tesseract_version = pytesseract.get_tesseract_version()
+    logger.info(f"Tesseract Version: {tesseract_version}")
+    logger.info(f"Tesseract Data Path: {os.getenv('TESSDATA_PREFIX', 'Not Set')}")
+    
+    # Try to get Tesseract path
+    try:
+        tesseract_path = subprocess.check_output(['which', 'tesseract']).decode().strip()
+        logger.info(f"Tesseract Path: {tesseract_path}")
+    except subprocess.CalledProcessError:
+        logger.error("Could not find Tesseract executable")
+    
+    # Check if tessdata directory exists
+    tessdata_prefix = os.getenv('TESSDATA_PREFIX', '/usr/share/tesseract-ocr/4.00/tessdata')
+    if os.path.exists(tessdata_prefix):
+        logger.info(f"Tessdata directory exists at: {tessdata_prefix}")
+        logger.info(f"Contents of tessdata: {os.listdir(tessdata_prefix)}")
+    else:
+        logger.error(f"Tessdata directory not found at: {tessdata_prefix}")
+        
+except Exception as e:
+    logger.error(f"Error checking Tesseract configuration: {str(e)}")
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 

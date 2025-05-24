@@ -2,11 +2,17 @@ services:
   - type: web
     name: ocr-app
     env: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: |
+      apt-get update -y
+      apt-get install -y tesseract-ocr
+      apt-get install -y libtesseract-dev
+      pip install -r requirements.txt
     startCommand: gunicorn app:app --workers 4 --timeout 120
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
+      - key: TESSDATA_PREFIX
+        value: /usr/share/tesseract-ocr/4.00/tessdata
     packages:
       - tesseract-ocr
       - libtesseract-dev 

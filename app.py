@@ -10,10 +10,14 @@ import io
 import base64
 import subprocess
 import logging
+import shutil
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+# Explicitly set the tesseract command path
+pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
@@ -23,28 +27,58 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Log Tesseract configuration
-try:
-    tesseract_version = pytesseract.get_tesseract_version()
-    logger.info(f"Tesseract Version: {tesseract_version}")
-    logger.info(f"Tesseract Data Path: {os.getenv('TESSDATA_PREFIX', 'Not Set')}")
+def check_tesseract():
+    logger.info("Checking Tesseract configuration...")
     
-    # Try to get Tesseract path
-    try:
-        tesseract_path = subprocess.check_output(['which', 'tesseract']).decode().strip()
-        logger.info(f"Tesseract Path: {tesseract_path}")
-    except subprocess.CalledProcessError:
-        logger.error("Could not find Tesseract executable")
+    # Log the explicitly set path
+    logger.info(f"Tesseract command path set to: {pytesseract.pytesseract.tesseract_cmd}")
     
-    # Check if tessdata directory exists
-    tessdata_prefix = os.getenv('TESSDATA_PREFIX', '/usr/share/tesseract-ocr/4.00/tessdata')
-    if os.path.exists(tessdata_prefix):
-        logger.info(f"Tessdata directory exists at: {tessdata_prefix}")
-        logger.info(f"Contents of tessdata: {os.listdir(tessdata_prefix)}")
+    # Check if the file exists
+    if os.path.exists(pytesseract.pytesseract.tesseract_cmd):
+        logger.info("✓ Tesseract executable found at the specified path")
     else:
-        logger.error(f"Tessdata directory not found at: {tessdata_prefix}")
+        logger.error("✗ Tesseract executable NOT found at the specified path")
         
-except Exception as e:
-    logger.error(f"Error checking Tesseract configuration: {str(e)}")
+        # Try to find tesseract in common locations
+        common_paths = [
+            '/usr/bin/tesseract',
+            '/usr/local/bin/tesseract',
+            '/opt/local/bin/tesseract'
+        ]
+        
+        for path in common_paths:
+            if os.path.exists(path):
+                logger.info(f"Found Tesseract at alternative path: {path}")
+                pytesseract.pytesseract.tesseract_cmd = path
+                break
+    
+    # Try to run tesseract version command
+    try:
+        version_output = subprocess.check_output([pytesseract.pytesseract.tesseract_cmd, '--version'], stderr=subprocess.STDOUT)
+        logger.info(f"Tesseract version output:\n{version_output.decode()}")
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Failed to get Tesseract version: {e.output.decode() if e.output else str(e)}")
+    except Exception as e:
+        logger.error(f"Error checking Tesseract version: {str(e)}")
+
+    # Check tessdata directory
+    tessdata_dir = '/usr/share/tesseract-ocr/4.00/tessdata'
+    if os.path.exists(tessdata_dir):
+        logger.info(f"✓ Found tessdata directory at: {tessdata_dir}")
+        try:
+            files = os.listdir(tessdata_dir)
+            logger.info(f"Tessdata contents: {files}")
+        except Exception as e:
+            logger.error(f"Error listing tessdata directory: {str(e)}")
+    else:
+        logger.error(f"✗ Tessdata directory not found at: {tessdata_dir}")
+        # Try alternative location
+        alt_tessdata = '/usr/share/tesseract-ocr/tessdata'
+        if os.path.exists(alt_tessdata):
+            logger.info(f"Found alternative tessdata at: {alt_tessdata}")
+
+# Run the check on startup
+check_tesseract()
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 

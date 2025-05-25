@@ -16,8 +16,33 @@ import shutil
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Explicitly set the tesseract command path
-pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
+# Try to find tesseract in common locations
+def find_tesseract():
+    common_paths = [
+        '/usr/bin/tesseract',
+        '/usr/local/bin/tesseract',
+        '/opt/local/bin/tesseract',
+        'tesseract'  # Will use system PATH
+    ]
+    
+    for path in common_paths:
+        try:
+            # Try to run tesseract version command
+            subprocess.check_output([path, '--version'], stderr=subprocess.STDOUT)
+            logger.info(f"Found working Tesseract at: {path}")
+            return path
+        except (subprocess.CalledProcessError, OSError):
+            continue
+    
+    raise RuntimeError("Tesseract not found in any common location")
+
+# Set tesseract command path
+try:
+    pytesseract.pytesseract.tesseract_cmd = find_tesseract()
+    logger.info(f"Successfully set tesseract_cmd to: {pytesseract.pytesseract.tesseract_cmd}")
+except Exception as e:
+    logger.error(f"Failed to set tesseract_cmd: {str(e)}")
+    raise
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'

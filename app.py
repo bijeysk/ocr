@@ -18,21 +18,47 @@ logger = logging.getLogger(__name__)
 
 # Try to find tesseract in common locations
 def find_tesseract():
+    # First check environment variable
+    env_path = os.getenv('TESSERACT_PATH')
+    if env_path:
+        try:
+            subprocess.check_output([env_path, '--version'], stderr=subprocess.STDOUT)
+            logger.info(f"Found working Tesseract from environment variable at: {env_path}")
+            return env_path
+        except (subprocess.CalledProcessError, OSError) as e:
+            logger.error(f"Failed to use Tesseract from environment variable: {str(e)}")
+
     common_paths = [
         '/usr/bin/tesseract',
         '/usr/local/bin/tesseract',
         '/opt/local/bin/tesseract',
-        'tesseract'  # Will use system PATH
+        'tesseract',  # Will use system PATH
+        '/usr/share/tesseract-ocr/bin/tesseract',
+        '/app/.apt/usr/bin/tesseract'  # Common Render path
     ]
+    
+    # Log current PATH
+    logger.info(f"Current PATH: {os.getenv('PATH', 'Not set')}")
     
     for path in common_paths:
         try:
             # Try to run tesseract version command
+            logger.info(f"Trying Tesseract path: {path}")
             subprocess.check_output([path, '--version'], stderr=subprocess.STDOUT)
             logger.info(f"Found working Tesseract at: {path}")
             return path
-        except (subprocess.CalledProcessError, OSError):
+        except (subprocess.CalledProcessError, OSError) as e:
+            logger.error(f"Failed to use Tesseract at {path}: {str(e)}")
             continue
+    
+    # Try to find tesseract using which command
+    try:
+        which_output = subprocess.check_output(['which', 'tesseract'], stderr=subprocess.STDOUT)
+        tesseract_path = which_output.decode().strip()
+        logger.info(f"Found Tesseract using which command at: {tesseract_path}")
+        return tesseract_path
+    except (subprocess.CalledProcessError, OSError) as e:
+        logger.error(f"Failed to find Tesseract using which command: {str(e)}")
     
     raise RuntimeError("Tesseract not found in any common location")
 

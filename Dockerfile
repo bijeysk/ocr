@@ -10,6 +10,18 @@ RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
+# Verify Tesseract and language data installation
+RUN tesseract --version && \
+    echo "Checking Tesseract locations:" && \
+    which tesseract && \
+    echo "Checking tessdata contents:" && \
+    ls -la /usr/share/tesseract-ocr/tessdata && \
+    echo "Verifying eng.traineddata:" && \
+    ls -la /usr/share/tesseract-ocr/tessdata/eng.traineddata && \
+    echo "Testing Tesseract OCR:" && \
+    echo "Hello World" > test.txt && \
+    tesseract test.txt stdout
+
 # Set working directory
 WORKDIR /app
 
@@ -25,9 +37,16 @@ COPY . .
 # Create uploads directory
 RUN mkdir -p uploads
 
-# Set environment variable for Tesseract
-ENV TESSDATA_PREFIX=/usr/share/tesseract-ocr/4.00/tessdata
+# Set environment variables for Tesseract
+ENV TESSDATA_PREFIX=/usr/share/tesseract-ocr/tessdata
 ENV TESSERACT_PATH=/usr/bin/tesseract
+ENV PYTHONUNBUFFERED=1
+
+# Additional verification of Tesseract setup
+RUN echo "Verifying final Tesseract configuration:" && \
+    echo "TESSDATA_PREFIX=$TESSDATA_PREFIX" && \
+    echo "TESSERACT_PATH=$TESSERACT_PATH" && \
+    ls -la $TESSDATA_PREFIX/eng.traineddata
 
 # Expose port
 EXPOSE 8000

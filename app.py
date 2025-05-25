@@ -16,58 +16,43 @@ import shutil
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Try to find tesseract in common locations
-def find_tesseract():
-    # First check environment variable
-    env_path = os.getenv('TESSERACT_PATH')
-    if env_path:
-        try:
-            subprocess.check_output([env_path, '--version'], stderr=subprocess.STDOUT)
-            logger.info(f"Found working Tesseract from environment variable at: {env_path}")
-            return env_path
-        except (subprocess.CalledProcessError, OSError) as e:
-            logger.error(f"Failed to use Tesseract from environment variable: {str(e)}")
-
-    common_paths = [
-        '/usr/bin/tesseract',
-        '/usr/local/bin/tesseract',
-        '/opt/local/bin/tesseract',
-        'tesseract',  # Will use system PATH
-        '/usr/share/tesseract-ocr/bin/tesseract',
-        '/app/.apt/usr/bin/tesseract'  # Common Render path
-    ]
+def verify_tesseract_setup():
+    """Verify Tesseract installation and configuration"""
+    logger.info("Verifying Tesseract setup...")
     
-    # Log current PATH
-    logger.info(f"Current PATH: {os.getenv('PATH', 'Not set')}")
+    # Check Tesseract executable
+    tesseract_path = os.getenv('TESSERACT_PATH', '/usr/bin/tesseract')
+    if not os.path.exists(tesseract_path):
+        raise RuntimeError(f"Tesseract executable not found at: {tesseract_path}")
     
-    for path in common_paths:
-        try:
-            # Try to run tesseract version command
-            logger.info(f"Trying Tesseract path: {path}")
-            subprocess.check_output([path, '--version'], stderr=subprocess.STDOUT)
-            logger.info(f"Found working Tesseract at: {path}")
-            return path
-        except (subprocess.CalledProcessError, OSError) as e:
-            logger.error(f"Failed to use Tesseract at {path}: {str(e)}")
-            continue
+    # Check TESSDATA_PREFIX
+    tessdata_prefix = os.getenv('TESSDATA_PREFIX', '/usr/share/tesseract-ocr/tessdata')
+    if not os.path.exists(tessdata_prefix):
+        raise RuntimeError(f"TESSDATA_PREFIX directory not found at: {tessdata_prefix}")
     
-    # Try to find tesseract using which command
+    # Check for English training data
+    eng_traineddata = os.path.join(tessdata_prefix, 'eng.traineddata')
+    if not os.path.exists(eng_traineddata):
+        raise RuntimeError(f"English language training data not found at: {eng_traineddata}")
+    
+    # Test Tesseract
     try:
-        which_output = subprocess.check_output(['which', 'tesseract'], stderr=subprocess.STDOUT)
-        tesseract_path = which_output.decode().strip()
-        logger.info(f"Found Tesseract using which command at: {tesseract_path}")
-        return tesseract_path
-    except (subprocess.CalledProcessError, OSError) as e:
-        logger.error(f"Failed to find Tesseract using which command: {str(e)}")
-    
-    raise RuntimeError("Tesseract not found in any common location")
+        version = subprocess.check_output([tesseract_path, '--version'], stderr=subprocess.STDOUT)
+        logger.info(f"Tesseract version: {version.decode()}")
+        
+        # List available languages
+        langs = subprocess.check_output([tesseract_path, '--list-langs'], stderr=subprocess.STDOUT)
+        logger.info(f"Available languages: {langs.decode()}")
+        
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"Failed to verify Tesseract: {e.output.decode()}")
 
-# Set tesseract command path
+# Try to set up Tesseract
 try:
-    pytesseract.pytesseract.tesseract_cmd = find_tesseract()
-    logger.info(f"Successfully set tesseract_cmd to: {pytesseract.pytesseract.tesseract_cmd}")
+    verify_tesseract_setup()
+    pytesseract.pytesseract.tesseract_cmd = os.getenv('TESSERACT_PATH', '/usr/bin/tesseract')
 except Exception as e:
-    logger.error(f"Failed to set tesseract_cmd: {str(e)}")
+    logger.error(f"Failed to set up Tesseract: {str(e)}")
     raise
 
 app = Flask(__name__)
@@ -113,20 +98,35 @@ def check_tesseract():
         logger.error(f"Error checking Tesseract version: {str(e)}")
 
     # Check tessdata directory
-    tessdata_dir = '/usr/share/tesseract-ocr/4.00/tessdata'
-    if os.path.exists(tessdata_dir):
-        logger.info(f"✓ Found tessdata directory at: {tessdata_dir}")
+    tessdata_paths = [
+        '/usr/share/tesseract-ocr/4.00/tessdata',
+        '/usr/share/tesseract-ocr/tessdata',
+        '/usr/local/share/tessdata',
+        os.getenv('TESSDATA_PREFIX', '')
+    ]
+
+    tessdata_found = False
+    for tessdata_dir in tessdata_paths:
+        if os.path.exists(tessdata_dir):
+            logger.info(f"✓ Found tessdata directory at: {tessdata_dir}")
+            try:
+                files = os.listdir(tessdata_dir)
+                logger.info(f"Tessdata contents: {files}")
+                tessdata_found = True
+                break
+            except Exception as e:
+                logger.error(f"Error listing tessdata directory: {str(e)}")
+
+    if not tessdata_found:
+        logger.error("✗ Tessdata directory not found in any of the expected locations")
+        logger.info("Searching for tessdata in system...")
         try:
-            files = os.listdir(tessdata_dir)
-            logger.info(f"Tessdata contents: {files}")
+            # Try to find tessdata using find command
+            find_output = subprocess.check_output(['find', '/', '-name', 'tessdata', '-type', 'd'], stderr=subprocess.STDOUT)
+            found_paths = find_output.decode().strip().split('\n')
+            logger.info(f"Found tessdata directories: {found_paths}")
         except Exception as e:
-            logger.error(f"Error listing tessdata directory: {str(e)}")
-    else:
-        logger.error(f"✗ Tessdata directory not found at: {tessdata_dir}")
-        # Try alternative location
-        alt_tessdata = '/usr/share/tesseract-ocr/tessdata'
-        if os.path.exists(alt_tessdata):
-            logger.info(f"Found alternative tessdata at: {alt_tessdata}")
+            logger.error(f"Error searching for tessdata: {str(e)}")
 
 # Run the check on startup
 check_tesseract()
